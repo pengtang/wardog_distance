@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Calculate the distance and angle between two coordinate points.">
+  <title>Distance and angle calculator</title>
+  <style>
+    :root {
+      color-scheme: light;
+      font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: #182230;
+      background: #f5f7fb;
+    }
+    * { box-sizing: border-box; }
+    body { max-width: 680px; margin: 0 auto; padding: 3rem 1rem; }
+    h1 { margin: 0 0 .4rem; line-height: 1.2; }
+    .intro, .hint { color: #526174; }
+    form, .result, .error {
+      margin-top: 1.25rem;
+      padding: 1.25rem;
+      border: 1px solid #d6dee8;
+      border-radius: 12px;
+      background: white;
+    }
+    fieldset { border: 0; padding: 0; margin: 0 0 1.25rem; }
+    legend { font-weight: 650; margin-bottom: .6rem; }
+    .coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: .75rem; }
+    label { display: block; font-size: .92rem; }
+    input {
+      display: block;
+      width: 100%;
+      margin-top: .25rem;
+      padding: .65rem .75rem;
+      border: 1px solid #aab7c7;
+      border-radius: 6px;
+      font: inherit;
+    }
+    input:focus { outline: 3px solid #b2ccff; border-color: #155eef; }
+    .combined { margin-top: .8rem; }
+    .hint { margin: .35rem 0 0; font-size: .85rem; }
+    button {
+      border: 0;
+      border-radius: 6px;
+      background: #155eef;
+      color: white;
+      padding: .7rem 1rem;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    button:hover { background: #004eeb; }
+    .result h2 { margin: 0 0 .75rem; }
+    .result p { margin: .35rem 0; }
+    .error { color: #b42318; border-color: #fecdca; }
+    [hidden] { display: none !important; }
+    @media (max-width: 440px) {
+      body { padding-top: 2rem; }
+      form, .result, .error { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>Distance and angle calculator</h1>
+    <p class="intro">Enter the coordinates for points A and B. For each point, use X and Y fields or enter both coordinates together.</p>
+
+    <form id="calculator">
+      <fieldset>
+        <legend>Point A</legend>
+        <div class="coordinates">
+          <label for="ax">X coordinate
+            <input id="ax" name="ax" type="number" step="any" inputmode="decimal">
+          </label>
+          <label for="ay">Y coordinate
+            <input id="ay" name="ay" type="number" step="any" inputmode="decimal">
+          </label>
+        </div>
+        <label class="combined" for="a-text">Or enter both coordinates
+          <input id="a-text" name="a-text" type="text" placeholder="x96.06, y109.84" autocomplete="off" spellcheck="false">
+        </label>
+        <p class="hint">If this field is filled in, it takes priority over X and Y.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Point B</legend>
+        <div class="coordinates">
+          <label for="bx">X coordinate
+            <input id="bx" name="bx" type="number" step="any" inputmode="decimal">
+          </label>
+          <label for="by">Y coordinate
+            <input id="by" name="by" type="number" step="any" inputmode="decimal">
+          </label>
+        </div>
+        <label class="combined" for="b-text">Or enter both coordinates
+          <input id="b-text" name="b-text" type="text" placeholder="x96.06, y109.84" autocomplete="off" spellcheck="false">
+        </label>
+        <p class="hint">If this field is filled in, it takes priority over X and Y.</p>
+      </fieldset>
+
+      <button type="submit">Calculate</button>
+    </form>
+
+    <p id="error" class="error" role="alert" hidden></p>
+    <section id="result" class="result" aria-live="polite" hidden>
+      <h2>Result</h2>
+      <p><strong>Distance:</strong> <span id="distance"></span></p>
+      <p><strong>Angle:</strong> <span id="angle"></span></p>
+      <p class="hint">Angle: 0° points up (+Y); angles increase clockwise.</p>
+    </section>
+  </main>
+
+  <script>
+    "use strict";
+
+    const numberPattern = String.raw`[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?`;
+    const combinedPattern = new RegExp(
+      String.raw`^\s*x\s*[:=]?\s*(${numberPattern})\s*,\s*y\s*[:=]?\s*(${numberPattern})\s*$`,
+      "i"
+    );
+
+    function readPoint(prefix) {
+      const combined = document.getElementById(`${prefix}-text`).value.trim();
+      let x;
+      let y;
+
+      if (combined) {
+        const match = combined.match(combinedPattern);
+        if (!match) {
+          throw new Error(`Point ${prefix.toUpperCase()}: use the format x96.06, y109.84.`);
+        }
+        x = Number(match[1]);
+        y = Number(match[2]);
+      } else {
+        const xValue = document.getElementById(`${prefix}x`).value.trim();
+        const yValue = document.getElementById(`${prefix}y`).value.trim();
+        if (!xValue || !yValue) {
+          throw new Error(`Point ${prefix.toUpperCase()}: enter both X and Y, or use the combined coordinate field.`);
+        }
+        x = Number(xValue);
+        y = Number(yValue);
+      }
+
+      if (!Number.isFinite(x) || !Number.isFinite(y)) {
+        throw new Error(`Point ${prefix.toUpperCase()}: coordinates must be finite numbers.`);
+      }
+      return { x, y };
+    }
+
+    document.getElementById("calculator").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const error = document.getElementById("error");
+      const result = document.getElementById("result");
+      error.hidden = true;
+      result.hidden = true;
+
+      try {
+        const a = readPoint("a");
+        const b = readPoint("b");
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const distance = Math.hypot(dx, dy) * 100;
+        const angle = (Math.atan2(dx, dy) * 180 / Math.PI + 360) % 360;
+
+        document.getElementById("distance").textContent = distance.toFixed(4);
+        document.getElementById("angle").textContent = `${angle.toFixed(2)}°`;
+        result.hidden = false;
+      } catch (exception) {
+        error.textContent = exception.message;
+        error.hidden = false;
+      }
+    });
+  </script>
+</body>
+</html>
